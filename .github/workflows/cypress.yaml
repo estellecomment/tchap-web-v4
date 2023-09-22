@@ -1,22 +1,31 @@
 # This is a tchap-specific file, inspired from the one in matrix-react-sdk
 name: Cypress End to End Tests
 
-# Run this job when the "Build" job completes
 on:
-    workflow_run:
-        workflows: ["Build"]
-        types:
-            - completed
+    # Run this job when the "Build" job completes
+    #workflow_run:
+    #    workflows: ["Build"]
+    #    types:
+    #        - completed
+    pull_request: {} # run for commits in PRs
     workflow_dispatch: # for running action manually
 
 env:
     # Removing this makes the job break.
     REPOSITORY: ${{ github.repository }}
     PR_NUMBER: ${{ github.event.pull_request.number }}
+    CACHE_KEY: $(git rev-parse --short=12 HEAD)-${{ github.event.pull_request.number }}-${{ github.job }}
 
 jobs:
+    call-build-job:
+        name: Build app for cypress test
+        uses: ./.github/workflows/reusable-build.yaml
+        with:
+            CACHE_KEY: "$CACHE_KEY"
+
     cypress:
         name: Cypress
+        needs: call-build-job # run after call-build-job has succeeded
         runs-on: ubuntu-latest
         steps:
             - name: Checkout code
@@ -32,16 +41,32 @@ jobs:
                   cache: "yarn"
                   node-version: ${{ steps.node_version.outputs.node_version }}
 
-            - name: Download build from artifact
-              # use this action instead of actions/download-artifact because we need the "workflow" param
-              uses: dawidd6/action-download-artifact@v2
-              with:
-                  name: devbuild
-                  path: webapp
-                  run_id: ${{ github.event.workflow_run.id }} # I think this is the run_id of the workflow that triggered this workflow
+            #####
+            # Get build from artifact. Not needed since we called reusable-build.yml in the same workflow, we can reuse the files.
+            #- name: Download build from artifact
+            #  # use this action instead of actions/download-artifact because we need the "workflow" param
+            #  uses: dawidd6/action-download-artifact@v2
+            #  with:
+            #      name: devbuild
+            #      path: webapp
+            #      run_id: ${{ github.event.workflow_run.id }} # I think this is the run_id of the workflow that triggered this workflow
 
-            - name: Install Dependencies
-              run: "yarn install" # this is needed otherwise "cypress: not found". Can we do just yarn install cypress to go faster ?
+            #- name: Install Dependencies
+            #  run: "yarn install" # this is needed otherwise "cypress: not found". Can we do just yarn install cypress to go faster ?
+
+            - name: Get build from cache
+              uses: actions/cache@v3
+              with:
+                  path: |
+                      ./webapp
+                      ./node_modules
+                  key: "$CACHE_KEY"
+
+            - name: Check presence of cache
+              run: ls ./webapp
+
+            - name: Install cypress
+              run: yarn add cypress --dev
 
             - name: Run Cypress tests
               uses: cypress-io/github-action@v6.5.0
