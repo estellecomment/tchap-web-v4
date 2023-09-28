@@ -12,6 +12,7 @@ function checkForDuplicateFiles(patchFile) {
         return;
     };
 
+
     let fileList = [];
     Object.values(patchFile).forEach((patchInfo) => {
         fileList = fileList.concat(patchInfo.files);
