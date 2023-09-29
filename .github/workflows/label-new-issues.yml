@@ -7,6 +7,7 @@ on:
             - opened
 jobs:
     label_issue:
+
         runs-on: ubuntu-latest
         steps:
             - uses: actions/github-script@v5
